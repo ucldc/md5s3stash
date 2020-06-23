@@ -209,6 +209,8 @@ def urlopen_with_auth(url, auth=None, cache={}):
     except KeyError:
         pass
 
+    logging.getLogger('MD5S3').debug(req)
+
     if not auth or is_s3_url(url):
         if p.scheme not in ['http', 'https']:
             return urllib.urlopen(url) # urllib works with normal file paths
@@ -221,6 +223,13 @@ def urlopen_with_auth(url, auth=None, cache={}):
         # else redirected to shib
         b64authstr = base64.b64encode('{0}:{1}'.format(*auth))
         req.add_header('Authorization', 'Basic {0}'.format(b64authstr))
+
+    if p.netloc == 'nuxeo.cdlib.org':
+        # https://stackoverflow.com/a/11744894/1763984
+        opener2 = urllib2.build_opener(NoRedirection())
+        response = opener2.open(req)
+        if response.code == 302:
+            req = urllib2.Request(response.headers['Location'])
 
     # return urllib2.urlopen(req)
     return opener.open(req)
@@ -334,6 +343,12 @@ class DefaultErrorHandler(urllib2.HTTPDefaultErrorHandler):
             req.get_full_url(), code, msg, headers, fp)
         result.status = code
         return result
+
+
+class NoRedirection(urllib2.HTTPErrorProcessor):
+    def http_response(self, request, response):
+        return response
+    https_response = http_response
 
 
 # main() idiom for importing into REPL for debugging
